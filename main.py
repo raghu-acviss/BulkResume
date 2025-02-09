@@ -16,24 +16,27 @@ ep = st.text_input("Enter the eligibility percentage ", type="default")
 
 click = st.button("Process")
 
-try:
-    global job_description
-    with pdfplumber.open(uploadedJD) as pdf:
-        pages = pdf.pages[0]
-        job_description = pages.extract_text()
+def extract_text_from_pdf(pdf_file):
+    """Extracts text from all pages of a PDF file."""
+    text = ""
+    try:
+        with pdfplumber.open(pdf_file) as pdf:
+            for page in pdf.pages:
+                text += page.extract_text() + "\n"
+    except:
+        st.write(f"Failed to process {pdf_file.name}")
+    return text.strip()
 
-except:
-    st.write("")
+job_description = ""
+if uploadedJD:
+    job_description = extract_text_from_pdf(uploadedJD)
 
-eligibility_percentage = None  # Initialize with a default value
-
+eligibility_percentage = None
 try:
     eligibility_percentage = float(ep)
 except:
-    st.write("")
+    st.write("Please enter a valid eligibility percentage.")
 
-
-# logic
 def getResult(JD_txt, resume_txt):
     content = [JD_txt, resume_txt]
     cv = CountVectorizer()
@@ -42,29 +45,21 @@ def getResult(JD_txt, resume_txt):
     match = similarity_matrix[0][1] * 100
     return match
 
-
-# button
 if click:
     if eligibility_percentage is not None:
         if uploadedCVs:
             for uploadedCV in uploadedCVs:
-                try:
-                    global resume
-                    with pdfplumber.open(uploadedCV) as pdf:
-                        pages = pdf.pages[0]
-                        resume = pages.extract_text()
-                except:
-                    st.write(f"Failed to process one of the uploaded resumes.")
-                    continue
-
-                match = getResult(job_description, resume)
-                match = round(match, 2)
-                st.write(f"Match Percentage for CV: {uploadedCV.name}: {match}%")
-
-                if match >= eligibility_percentage:
-                    st.success(f"{uploadedCV.name} is eligible for the position!")
+                resume_text = extract_text_from_pdf(uploadedCV)
+                if resume_text:
+                    match = getResult(job_description, resume_text)
+                    match = round(match, 2)
+                    st.write(f"Match Percentage for CV: {uploadedCV.name}: {match}%")
+                    if match >= eligibility_percentage:
+                        st.success(f"{uploadedCV.name} is eligible for the position!")
+                    else:
+                        st.write(f"Sorry, {uploadedCV.name} is not eligible.")
                 else:
-                    st.write(f"Sorry, {uploadedCV.name} is not eligible")
+                    st.write(f"No text extracted from {uploadedCV.name}, skipping analysis.")
         else:
             st.write("Please upload at least one resume.")
     else:
